@@ -1,482 +1,258 @@
 package com.voidglass.app
 
-import android.Manifest
-import android.content.pm.PackageManager
+import android.app.Activity
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.Canvas
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-
-data class Lang(val code: String, val name: String, val hello: String, val cont: String)
-
-val LANGS = listOf(
-    Lang("es", "Español", "Hola", "Continuar"),
-    Lang("en", "English", "Hello", "Continue"),
-    Lang("pt", "Português", "Olá", "Continuar"),
-    Lang("fr", "Français", "Bonjour", "Continuer"),
-    Lang("de", "Deutsch", "Hallo", "Weiter"),
-    Lang("it", "Italiano", "Ciao", "Continua"),
-    Lang("ja", "日本語", "こんにちは", "続ける"),
-    Lang("ko", "한국어", "안녕하세요", "계속"),
-    Lang("zh", "中文", "你好", "继续"),
-    Lang("ru", "Русский", "Привет", "Продолжить"),
-    Lang("ar", "العربية", "مرحبا", "متابعة"),
-    Lang("hi", "हिन्दी", "नमस्ते", "जारी रखें"),
-    Lang("tr", "Türkçe", "Merhaba", "Devam"),
-    Lang("nl", "Nederlands", "Hallo", "Doorgaan"),
-    Lang("pl", "Polski", "Cześć", "Dalej"),
-)
-
-data class Mod(
-    val id: String, val es: String, val en: String,
-    val descEs: String, val descEn: String, val conflicts: List<String>
-)
-
-val MODS = listOf(
-    Mod("glass", "Liquid glass del sistema", "System liquid glass",
-        "Cristal líquido en ajustes rápidos, notificaciones y bloqueo",
-        "Liquid glass on quick settings, notifications and lockscreen", listOf("hyperos")),
-    Mod("clock", "Reloj de bloqueo", "Lockscreen clock",
-        "Relojes animados para la pantalla de bloqueo",
-        "Animated lockscreen clocks", listOf()),
-    Mod("hyperos", "Estilo HyperOS", "HyperOS style",
-        "Centro de control y ajustes al estilo HyperOS",
-        "HyperOS-style control center and settings", listOf("glass")),
-)
-
-typealias G = (Dp) -> Modifier
-
-suspend fun checkRoot(): Boolean = withContext(Dispatchers.IO) {
-    try { Runtime.getRuntime().exec(arrayOf("su", "-c", "id")).waitFor() == 0 } catch (e: Exception) { false }
-}
 
 class MainActivity : ComponentActivity() {
+    private val tick = mutableIntStateOf(0)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { VoidApp() }
+        val app = AppState(getSharedPreferences("voidglass", 0))
+        setContent { VoidApp(app, tick.intValue) }
+    }
+    override fun onResume() {
+        super.onResume()
+        tick.intValue++
     }
 }
 
 @Composable
-fun Tx(
-    text: String, size: Int = 16, w: FontWeight = FontWeight.ExtraLight, a: Float = 1f,
-    sp: Float = 0f, modifier: Modifier = Modifier, align: TextAlign? = null
-) {
-    Text(
-        text, modifier = modifier, color = Color.White.copy(alpha = a), fontSize = size.sp,
-        fontWeight = w, letterSpacing = sp.sp, textAlign = align
-    )
-}
-
-@Composable
-fun BlackHole(modifier: Modifier = Modifier) {
-    Canvas(modifier) {
-        val c = center
-        val r = size.minDimension * 0.22f
-        rotate(-20f, c) {
-            drawOval(
-                Color(0xFFCFCFE8),
-                topLeft = Offset(c.x - r * 1.5f, c.y - r * 0.4f),
-                size = Size(r * 3f, r * 0.8f),
-                style = Stroke(1.5.dp.toPx())
-            )
-        }
-        drawCircle(Color.Black, r, c)
-        drawCircle(Color(0xFFF2F2FF), r, c, style = Stroke(2.dp.toPx()))
-        drawCircle(Color(0x33FFFFFF), r * 1.3f, c, style = Stroke(1.dp.toPx()))
-    }
-}
-
-@Composable
-fun Pill(text: String, glass: G, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Box(
-        modifier.height(52.dp).then(glass(26.dp)).clickable(onClick = onClick).padding(horizontal = 28.dp),
-        contentAlignment = Alignment.Center
-    ) { Tx(text, 16, sp = 1f) }
-}
-
-@Composable
-fun Card(glass: G, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Column(modifier.fillMaxWidth().then(glass(24.dp)).padding(20.dp), content = content)
-}
-
-@Composable
-fun MiniSwitch(on: Boolean, onClick: () -> Unit) {
-    Box(
-        Modifier.width(48.dp).height(28.dp).clip(CircleShape)
-            .background(if (on) Color(0xFFEDEDF7) else Color(0x33FFFFFF))
-            .clickable(onClick = onClick).padding(3.dp),
-        contentAlignment = if (on) Alignment.CenterEnd else Alignment.CenterStart
-    ) {
-        Box(Modifier.size(22.dp).background(if (on) Color.Black else Color.White, CircleShape))
-    }
-}
-
-@Composable
-fun Overlay(glass: G, onDismiss: () -> Unit, content: @Composable () -> Unit) {
-    Box(
-        Modifier.fillMaxSize().background(Color(0x99000000)).clickable(onClick = onDismiss),
-        contentAlignment = Alignment.Center
-    ) {
-        Box(Modifier.padding(32.dp).fillMaxWidth().then(glass(28.dp)).clickable { }) { content() }
-    }
-}
-
-@Composable
-fun Welcome(lang: Lang, glass: G, onLang: () -> Unit, onNext: () -> Unit) {
-    var intro by remember { mutableStateOf(true) }
-    var hello by remember { mutableStateOf(LANGS[0].hello) }
-    LaunchedEffect(Unit) {
-        for (l in LANGS) { hello = l.hello; delay(500) }
-        intro = false
-    }
-    LaunchedEffect(lang.code) { if (lang.code != "es") intro = false }
-    Column(Modifier.fillMaxSize().padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-            Tx(lang.name, 14, a = 0.6f, sp = 1f, modifier = Modifier.clickable { onLang() }.padding(8.dp))
-        }
-        Spacer(Modifier.weight(1f))
-        BlackHole(Modifier.size(110.dp))
-        Spacer(Modifier.height(36.dp))
-        Crossfade(if (intro) hello else lang.hello, animationSpec = tween(500), label = "h") {
-            Tx(it, 40, FontWeight.Thin, sp = 2f)
-        }
-        Spacer(Modifier.weight(1f))
-        Pill(lang.cont, glass, Modifier.fillMaxWidth(), onNext)
-        Spacer(Modifier.height(8.dp))
-    }
-}
-
-@Composable
-fun PermRow(name: String, desc: String, ok: Boolean, action: String, glass: G, onClick: () -> Unit) {
-    Card(glass) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Tx(name, 18, FontWeight.Light)
-                Spacer(Modifier.height(4.dp))
-                Tx(desc, 13, a = 0.5f)
-            }
-            if (ok) Tx("✓", 20, a = 0.9f)
-            else Tx(action, 14, FontWeight.Normal, a = 0.9f, sp = 1f, modifier = Modifier.clickable { onClick() }.padding(8.dp))
-        }
-    }
-}
-
-@Composable
-fun Permissions(tr: (String, String) -> String, glass: G, root: Boolean?, onRoot: (Boolean) -> Unit, onNext: () -> Unit) {
+fun VoidApp(app: AppState, tick: Int) {
+    val sysDark = isSystemInDarkTheme()
+    val dark = when (app.theme) { 1 -> false; 2 -> true; else -> sysDark }
     val ctx = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var notif by remember {
-        mutableStateOf(
-            Build.VERSION.SDK_INT < 33 ||
-                ctx.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+    val cs = if (Build.VERSION.SDK_INT >= 31) {
+        if (dark) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
+    } else {
+        if (dark) darkColorScheme() else lightColorScheme()
+    }
+    val view = LocalView.current
+    SideEffect {
+        (view.context as? Activity)?.window?.let { w ->
+            val c = WindowCompat.getInsetsController(w, view)
+            c.isAppearanceLightStatusBars = !dark
+            c.isAppearanceLightNavigationBars = !dark
+        }
+    }
+    MaterialTheme(colorScheme = cs) {
+        CompositionLocalProvider(LocalApp provides app, LocalDark provides dark) { AppRoot(tick) }
+    }
+}
+
+@Composable
+fun HomeShell(tick: Int, tab: Int, onTab: (Int) -> Unit, onPerms: () -> Unit, onCredits: () -> Unit, onReplay: () -> Unit) {
+    val app = LocalApp.current
+    Column(Modifier.fillMaxSize()) {
+        Box(Modifier.weight(1f)) {
+            AnimatedContent(
+                targetState = tab,
+                transitionSpec = {
+                    val dir = if (targetState > initialState) 1 else -1
+                    (fadeIn(tween(300)) + slideInHorizontally(tween(300)) { dir * it / 8 }) togetherWith
+                        (fadeOut(tween(200)) + slideOutHorizontally(tween(200)) { -dir * it / 8 })
+                },
+                label = "tab"
+            ) { t ->
+                when (t) {
+                    0 -> HomeTab(tick, onPerms)
+                    1 -> StyleTab()
+                    2 -> ModulesTab()
+                    else -> SettingsTab(tick, onPerms, onCredits, onReplay)
+                }
+            }
+        }
+        GTabs(
+            listOf(app.tr("Inicio", "Home"), app.tr("Estilo", "Style"), app.tr("Módulos", "Modules"), app.tr("Ajustes", "Settings")),
+            tab, onTab
         )
     }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { notif = it }
-    Column(Modifier.fillMaxSize().padding(28.dp)) {
-        Spacer(Modifier.height(24.dp))
-        Tx(tr("Permisos", "Permissions"), 34, FontWeight.Thin, sp = 2f)
-        Spacer(Modifier.height(8.dp))
-        Tx(tr("Lo mínimo para empezar.", "Just what's needed to start."), 14, a = 0.5f)
-        Spacer(Modifier.height(36.dp))
-        PermRow(
-            tr("Acceso root", "Root access"), tr("Para aplicar cambios al sistema", "To apply changes to the system"),
-            root == true, tr("Conceder", "Grant"), glass
-        ) { scope.launch { onRoot(checkRoot()) } }
-        Spacer(Modifier.height(16.dp))
-        PermRow(
-            tr("Notificaciones", "Notifications"), tr("Avisos de estado y errores", "Status and error alerts"),
-            notif, tr("Conceder", "Grant"), glass
-        ) { launcher.launch(Manifest.permission.POST_NOTIFICATIONS) }
-        Spacer(Modifier.weight(1f))
-        Pill(tr("Continuar", "Continue"), glass, Modifier.fillMaxWidth(), onNext)
-        Spacer(Modifier.height(8.dp))
-    }
 }
 
 @Composable
-fun CreditRow(name: String, project: String, desc: String) {
-    Column(Modifier.padding(bottom = 22.dp)) {
-        Tx(name, 18, FontWeight.Light)
-        if (project.isNotEmpty()) Tx(project, 13, a = 0.55f, sp = 0.5f)
-        Spacer(Modifier.height(2.dp))
-        Tx(desc, 13, a = 0.4f)
-    }
-}
-
-@Composable
-fun Credits(tr: (String, String) -> String, glass: G, last: Boolean, onDone: () -> Unit) {
-    Column(Modifier.fillMaxSize().padding(28.dp)) {
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            Spacer(Modifier.height(24.dp))
-            Tx(tr("Gracias", "Thanks"), 34, FontWeight.Thin, sp = 2f)
-            Spacer(Modifier.height(8.dp))
-            Tx(tr("VoidGlass existe gracias al trabajo de:", "VoidGlass exists thanks to the work of:"), 14, a = 0.5f)
-            Spacer(Modifier.height(32.dp))
-            CreditRow("Kyant0", "AndroidLiquidGlass",
-                tr("El efecto liquid glass de esta app", "The liquid glass effect of this app"))
-            CreditRow("Mahmud0808 (DrDisagree)", "GlassLayer · XMorphClock",
-                tr("Liquid glass de sistema y relojes de bloqueo", "System liquid glass and lockscreen clocks"))
-            CreditRow("LSPosed", "Xposed",
-                tr("La base para modificar el sistema", "The base for modifying the system"))
-            CreditRow("LineageOS", "",
-                tr("El sistema donde nace todo esto", "The system where all this is born"))
-            Spacer(Modifier.height(10.dp))
-            Card(glass) {
-                Tx(tr("Beta temprana", "Early beta"), 16, FontWeight.Light, sp = 1f)
-                Spacer(Modifier.height(6.dp))
-                Tx(
-                    tr(
-                        "Probada solo en Redmi 9 (Lancelot) con LineageOS 24.0, Android 17. En otros dispositivos puede fallar.",
-                        "Tested only on Redmi 9 (Lancelot) with LineageOS 24.0, Android 17. It may fail on other devices."
-                    ), 13, a = 0.55f
-                )
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-        Pill(if (last) tr("Entrar", "Enter") else tr("Volver", "Back"), glass, Modifier.fillMaxWidth(), onDone)
-        Spacer(Modifier.height(8.dp))
-    }
-}
-
-@Composable
-fun Home(
-    tr: (String, String) -> String, glass: G, enabled: Map<String, Boolean>, root: Boolean?,
-    langName: String, onToggle: (Mod) -> Unit, onLang: () -> Unit, onCredits: () -> Unit, onReplay: () -> Unit
-) {
-    var tab by remember { mutableStateOf(0) }
-    Column(Modifier.fillMaxSize()) {
-        Column(
-            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 16.dp)
-        ) {
-            when (tab) {
-                0 -> {
-                    Spacer(Modifier.height(24.dp))
-                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { BlackHole(Modifier.size(110.dp)) }
-                    Spacer(Modifier.height(16.dp))
-                    Tx("VoidGlass", 34, FontWeight.Thin, sp = 3f, modifier = Modifier.fillMaxWidth(), align = TextAlign.Center)
-                    Tx("beta 0.1", 12, a = 0.45f, sp = 3f, modifier = Modifier.fillMaxWidth(), align = TextAlign.Center)
-                    Spacer(Modifier.height(36.dp))
-                    Card(glass) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Tx("Root", 16, FontWeight.Light)
-                            Tx(
-                                when (root) { true -> tr("Activo", "Active"); false -> tr("No detectado", "Not detected"); else -> "…" },
-                                15, a = 0.6f
-                            )
-                        }
-                        Spacer(Modifier.height(14.dp))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Tx(tr("Módulos activos", "Active modules"), 16, FontWeight.Light)
-                            Tx("${MODS.count { enabled[it.id] == true }} / ${MODS.size}", 15, a = 0.6f)
-                        }
-                    }
-                }
-                1 -> {
-                    Spacer(Modifier.height(16.dp))
-                    Tx(tr("Módulos", "Modules"), 30, FontWeight.Thin, sp = 2f)
-                    Spacer(Modifier.height(6.dp))
-                    Tx(tr("Aún no aplican cambios reales al sistema.", "They don't apply real system changes yet."), 13, a = 0.45f)
-                    Spacer(Modifier.height(24.dp))
-                    MODS.forEach { m ->
-                        Card(glass) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f).padding(end = 12.dp)) {
-                                    Tx(tr(m.es, m.en), 17, FontWeight.Light)
-                                    Spacer(Modifier.height(4.dp))
-                                    Tx(tr(m.descEs, m.descEn), 12, a = 0.45f)
-                                }
-                                MiniSwitch(enabled[m.id] == true) { onToggle(m) }
-                            }
-                        }
-                        Spacer(Modifier.height(14.dp))
-                    }
-                }
-                else -> {
-                    Spacer(Modifier.height(16.dp))
-                    Tx(tr("Ajustes", "Settings"), 30, FontWeight.Thin, sp = 2f)
-                    Spacer(Modifier.height(24.dp))
-                    @Composable
-                    fun Row2(label: String, value: String, onClick: () -> Unit) {
-                        Row(
-                            Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 18.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Tx(label, 17, FontWeight.Light)
-                            Tx(value, 15, a = 0.45f)
-                        }
-                    }
-                    Row2(tr("Idioma", "Language"), langName, onLang)
-                    Row2(tr("Créditos", "Credits"), "", onCredits)
-                    Row2(tr("Repetir bienvenida", "Replay welcome"), "", onReplay)
-                    Row2(tr("Versión", "Version"), "0.1 beta") { }
-                }
-            }
-        }
-        Row(
-            Modifier.padding(horizontal = 24.dp, vertical = 12.dp).fillMaxWidth().height(60.dp).then(glass(30.dp)),
-            horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically
-        ) {
-            listOf(tr("Inicio", "Home"), tr("Módulos", "Modules"), tr("Ajustes", "Settings")).forEachIndexed { i, s ->
-                Tx(
-                    s, 15, if (tab == i) FontWeight.Normal else FontWeight.ExtraLight,
-                    a = if (tab == i) 1f else 0.5f, sp = 1f,
-                    modifier = Modifier.clickable { tab = i }.padding(horizontal = 16.dp, vertical = 12.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun VoidApp() {
-    val ctx = LocalContext.current
-    val prefs = remember { ctx.getSharedPreferences("voidglass", 0) }
+fun AppRoot(tick: Int) {
+    val app = LocalApp.current
+    val dark = LocalDark.current
+    val cs = MaterialTheme.colorScheme
     val backdrop = rememberLayerBackdrop()
-    var langIdx by remember { mutableStateOf(prefs.getInt("lang", 0)) }
-    val lang = LANGS[langIdx]
-    val tr: (String, String) -> String = { es, en -> if (lang.code == "es") es else en }
-    var screen by remember { mutableStateOf(if (prefs.getBoolean("onboarded", false)) "home" else "welcome") }
-    var showLangs by remember { mutableStateOf(false) }
-    var warn by remember { mutableStateOf<String?>(null) }
-    var root by remember { mutableStateOf<Boolean?>(null) }
-    val enabled = remember {
-        mutableStateMapOf<String, Boolean>().also { m -> MODS.forEach { m[it.id] = prefs.getBoolean("mod_" + it.id, false) } }
-    }
+    var screen by remember { mutableStateOf(if (app.onboarded) "home" else "welcome") }
+    var tab by remember { mutableStateOf(0) }
 
-    LaunchedEffect(screen) { if (screen == "home" && root == null) root = checkRoot() }
-    BackHandler(enabled = showLangs || warn != null || screen == "credits_view") {
-        if (showLangs) showLangs = false else if (warn != null) warn = null else screen = "home"
+    LaunchedEffect(tick, screen) {
+        if (screen == "home" || screen == "perms" || screen == "perms_onb") {
+            app.root = checkRoot()
+            app.lsposed = if (app.root == true) checkLsposed() else false
+        }
+    }
+    BackHandler(enabled = app.showLangs || app.dialog != null || screen == "perms" || screen == "credits") {
+        if (app.showLangs) app.showLangs = false
+        else if (app.dialog != null) app.dialog = null
+        else screen = "home"
     }
 
     val t = rememberInfiniteTransition(label = "bg")
-    val drift by t.animateFloat(
-        0f, 1f, infiniteRepeatable(tween(12000, easing = LinearEasing), RepeatMode.Reverse), label = "drift"
-    )
-
+    val d by t.animateFloat(0f, 1f, infiniteRepeatable(tween(14000, easing = LinearEasing), RepeatMode.Reverse), label = "d")
+    val tint = tintFor(dark, app.tint)
     val glass: G = { r: Dp ->
         Modifier.drawBackdrop(
             backdrop = backdrop,
             shape = { RoundedCornerShape(r) },
             effects = {
                 vibrancy()
-                blur(3.dp.toPx())
-                lens(10.dp.toPx(), 20.dp.toPx())
-            }
+                blur(app.blur.coerceAtLeast(0.5f).dp.toPx())
+                lens(app.lens.coerceAtLeast(1f).dp.toPx(), (app.lens * 2f).coerceAtLeast(2f).dp.toPx())
+            },
+            onDrawSurface = { drawRect(tint) }
         )
     }
+    val glowA = if (dark) 0.35f else 0.30f
 
-    val onToggle: (Mod) -> Unit = { m ->
-        val on = enabled[m.id] == true
-        val other = if (!on) MODS.firstOrNull { it.id in m.conflicts && enabled[it.id] == true } else null
-        if (other != null) {
-            warn = tr(
-                "Para activar «${m.es}» primero desactiva «${other.es}». No pueden estar activados a la vez.",
-                "To enable \"${m.en}\" first turn off \"${other.en}\". They can't be on at the same time."
-            )
-        } else {
-            enabled[m.id] = !on
-            prefs.edit().putBoolean("mod_" + m.id, !on).apply()
-        }
-    }
-
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    Box(Modifier.fillMaxSize().background(cs.background)) {
         Box(Modifier.fillMaxSize().layerBackdrop(backdrop)) {
             Box(
-                Modifier.offset(x = (-80 + 60 * drift).dp, y = (60 + 40 * drift).dp).size(340.dp)
-                    .background(Brush.radialGradient(listOf(Color(0x556C5CFF), Color.Transparent)), CircleShape)
+                Modifier.offset(x = (-90 + 80 * d).dp, y = (40 + 50 * d).dp).size(380.dp)
+                    .background(Brush.radialGradient(listOf(cs.primary.copy(alpha = glowA), Color.Transparent)), CircleShape)
             )
             Box(
-                Modifier.align(Alignment.BottomEnd).offset(x = (70 - 50 * drift).dp, y = (70 - 40 * drift).dp).size(380.dp)
-                    .background(Brush.radialGradient(listOf(Color(0x3300B8FF), Color.Transparent)), CircleShape)
+                Modifier.align(Alignment.BottomEnd).offset(x = (80 - 60 * d).dp, y = (70 - 50 * d).dp).size(400.dp)
+                    .background(Brush.radialGradient(listOf(cs.tertiary.copy(alpha = glowA), Color.Transparent)), CircleShape)
+            )
+            Box(
+                Modifier.align(Alignment.CenterStart).offset(x = (-120 + 60 * d).dp, y = (100 - 80 * d).dp).size(300.dp)
+                    .background(Brush.radialGradient(listOf(cs.secondary.copy(alpha = glowA * 0.8f), Color.Transparent)), CircleShape)
             )
         }
 
-        Box(Modifier.fillMaxSize().systemBarsPadding()) {
-            Crossfade(screen, animationSpec = tween(350), label = "screen") { s ->
-                when (s) {
-                    "welcome" -> Welcome(lang, glass, { showLangs = true }) { screen = "perms" }
-                    "perms" -> Permissions(tr, glass, root, { root = it }) { screen = "credits" }
-                    "credits" -> Credits(tr, glass, true) {
-                        prefs.edit().putBoolean("onboarded", true).apply(); screen = "home"
-                    }
-                    "credits_view" -> Credits(tr, glass, false) { screen = "home" }
-                    else -> Home(
-                        tr, glass, enabled, root, lang.name, onToggle,
-                        { showLangs = true }, { screen = "credits_view" },
-                        { prefs.edit().putBoolean("onboarded", false).apply(); screen = "welcome" }
-                    )
-                }
-            }
-        }
-
-        if (showLangs) {
-            Overlay(glass, { showLangs = false }) {
-                LazyColumn(Modifier.heightIn(max = 440.dp).padding(vertical = 12.dp)) {
-                    items(LANGS) { l ->
-                        Tx(
-                            (if (l.code == lang.code) "✓   " else "      ") + l.name, 18, FontWeight.Light,
-                            modifier = Modifier.fillMaxWidth().clickable {
-                                langIdx = LANGS.indexOf(l)
-                                prefs.edit().putInt("lang", langIdx).apply()
-                                showLangs = false
-                            }.padding(horizontal = 24.dp, vertical = 14.dp)
+        CompositionLocalProvider(LocalGlass provides glass) {
+            Box(Modifier.fillMaxSize().systemBarsPadding()) {
+                AnimatedContent(
+                    targetState = screen,
+                    transitionSpec = {
+                        (fadeIn(tween(350)) + slideInVertically(tween(350)) { it / 24 }) togetherWith
+                            (fadeOut(tween(250)) + slideOutVertically(tween(250)) { -it / 24 })
+                    },
+                    label = "screen"
+                ) { s ->
+                    when (s) {
+                        "welcome" -> Welcome({ app.showLangs = true }) { screen = "perms_onb" }
+                        "perms_onb" -> PermissionsScreen(tick, true) { screen = "credits_onb" }
+                        "credits_onb" -> Credits(true) { app.onboarded = true; app.save(); screen = "home" }
+                        "perms" -> PermissionsScreen(tick, false) { screen = "home" }
+                        "credits" -> Credits(false) { screen = "home" }
+                        else -> HomeShell(
+                            tick, tab, { tab = it }, { screen = "perms" }, { screen = "credits" },
+                            { app.onboarded = false; app.save(); screen = "welcome" }
                         )
                     }
                 }
             }
-        }
 
-        warn?.let { msg ->
-            Overlay(glass, { warn = null }) {
-                Column(Modifier.padding(24.dp)) {
-                    Tx(msg, 16, FontWeight.Light)
-                    Spacer(Modifier.height(20.dp))
-                    Tx("OK", 16, FontWeight.Normal, sp = 1f, modifier = Modifier.clickable { warn = null }.padding(8.dp))
+            if (app.showLangs) {
+                Overlay({ app.showLangs = false }) {
+                    LazyColumn(Modifier.heightIn(max = 440.dp).padding(vertical = 12.dp)) {
+                        items(LANGS) { l ->
+                            Tx(
+                                (if (l.code == app.lang.code) "✓   " else "      ") + l.name, 18,
+                                modifier = Modifier.fillMaxWidth().bounceClick {
+                                    app.langIdx = LANGS.indexOf(l); app.save(); app.showLangs = false
+                                }.padding(horizontal = 24.dp, vertical = 14.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            app.dialog?.let { dlg ->
+                Overlay({ app.dialog = null }) {
+                    Column(Modifier.padding(24.dp)) {
+                        Tx(dlg.msg, 16)
+                        Spacer(Modifier.height(20.dp))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            if (dlg.action != null) {
+                                Tx(
+                                    app.tr("Cancelar", "Cancel"), 15, a = 0.7f,
+                                    modifier = Modifier.bounceClick { app.dialog = null }.padding(12.dp)
+                                )
+                                Tx(
+                                    dlg.actionLabel, 15, FontWeight.Medium, color = cs.primary,
+                                    modifier = Modifier.bounceClick { app.dialog = null; dlg.action.invoke() }.padding(12.dp)
+                                )
+                            } else {
+                                Tx(
+                                    "OK", 15, FontWeight.Medium, color = cs.primary,
+                                    modifier = Modifier.bounceClick { app.dialog = null }.padding(12.dp)
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
