@@ -1,11 +1,10 @@
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 android {
     namespace = "com.voidglass.app"
-    compileSdk = 36
+    compileSdk = 37
     defaultConfig {
         applicationId = "com.voidglass.app"
         minSdk = 33
@@ -19,7 +18,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 }
-kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.07.00"))
     implementation("androidx.compose.ui:ui")
